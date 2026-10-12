@@ -1,6 +1,6 @@
 {
 	"name": "claude-agents-skills",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Claude Code mod that loads Agent Skills from the shared .agents/skills directories",
 	"type": "module",
 	"private": true,

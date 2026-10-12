@@ -53,6 +53,8 @@ plugins/agents-skills/
 ## Limits
 
 - Not native discovery. The engine still does not walk `.agents/skills` itself, so skills reach the session through these hooks.
+- The model decides whether to invoke a skill on its own. A stronger model picks a matching one out of the system prompt section, and a smaller one may act only when you run `/<name>` or name the skill in your prompt.
+- A name Claude Code already provides wins. The mod skips the command and leaves the Skill tool call to the engine.
 - Engine-owned inventories, such as the skill list behind `/skills` and the Skill tool's own listing of known skills, do not contain these skills. The system prompt section is where the model learns about them.
 - A mod runs with your permissions and is not sandboxed. Read the module before installing.
 - The mods API is early access and may change between releases.

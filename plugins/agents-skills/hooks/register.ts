@@ -141,12 +141,13 @@ async function discover($: any): Promise<Entry[]> {
 
 function catalog(entries: Entry[]): string {
 	return [
-		"Agent Skills shared through .agents/skills, the same files other coding agents read:",
+		"Agent Skills shared through .agents/skills, the same files other coding agents read.",
+		'Invoke a matching one with the Skill tool as Skill({ skill: "<name>", args: "<text to pass>" }) instead of paraphrasing it.',
 		...entries.map(
 			(entry) => `- ${entry.name}: ${entry.description || "(no description)"}`,
 		),
-		"Invoke one with the Skill tool by name, or read its SKILL.md before following it:",
-		...entries.map((entry) => `- ${entry.name} → ${entry.path}`),
+		"Skill text: " +
+			entries.map((entry) => `${entry.name} -> ${entry.path}`).join(" | "),
 	].join("\n");
 }
 
@@ -183,6 +184,7 @@ async function loadEntries($: any, refresh: boolean): Promise<Entry[]> {
 
 export function register(on: any): void {
 	const registered = new Set<string>();
+	const nativeNames = new Set<string>();
 
 	on("session.start", async ($: any, e: any, next: any) => {
 		const list = await loadEntries($, true);
@@ -195,7 +197,11 @@ export function register(on: any): void {
 			taken = new Set();
 		}
 		for (const entry of list) {
-			if (taken.has(entry.name) || registered.has(entry.name)) continue;
+			if (registered.has(entry.name)) continue;
+			if (taken.has(entry.name)) {
+				nativeNames.add(entry.name);
+				continue;
+			}
 			try {
 				await $.command.register({
 					name: entry.name,
@@ -204,6 +210,7 @@ export function register(on: any): void {
 				registered.add(entry.name);
 			} catch {
 				// 組み込みコマンドと衝突した場合はネイティブ側を優先する
+				nativeNames.add(entry.name);
 			}
 		}
 		return next(e);
@@ -223,6 +230,7 @@ export function register(on: any): void {
 	});
 
 	on("command.run", async ($: any, e: any, next: any) => {
+		if (nativeNames.has(e.command)) return next(e);
 		const list = await loadEntries($, false);
 		const entry = list.find((candidate) => candidate.name === e.command);
 		if (!entry) return next(e);
@@ -232,6 +240,7 @@ export function register(on: any): void {
 	}).catch((_$: any, e: any, next: any) => next(e));
 
 	on("tool.call", { tool: "Skill" }, async ($: any, e: any, next: any) => {
+		if (nativeNames.has(e.skill)) return next(e);
 		const list = await loadEntries($, false);
 		const entry = list.find((candidate) => candidate.name === e.skill);
 		if (!entry) return next(e);
