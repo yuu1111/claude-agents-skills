@@ -1,0 +1,6 @@
+{
+  "description": "Bridge .agents/skills into Claude Code: list the skills for the model and register each as a slash command",
+  "modules": [
+    "./register.ts"
+  ]
+}

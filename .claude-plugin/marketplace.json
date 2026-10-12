@@ -1,0 +1,15 @@
+{
+  "name": "claude-agents-skills",
+  "owner": {
+    "name": "yuu1111",
+    "url": "https://github.com/yuu1111"
+  },
+  "description": "Claude Code mods by yuu1111",
+  "plugins": [
+    {
+      "name": "agents-skills",
+      "source": "./plugins/agents-skills",
+      "description": "Load Agent Skills from the shared .agents/skills directories (project and user) into Claude Code"
+    }
+  ]
+}
