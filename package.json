@@ -1,27 +1,27 @@
 {
-  "name": "claude-agents-skills",
-  "version": "0.1.0",
-  "description": "Claude Code mod that loads Agent Skills from the shared .agents/skills directories",
-  "type": "module",
-  "private": true,
-  "scripts": {
-    "lint": "biome check .",
-    "format": "biome check --write --unsafe ."
-  },
-  "keywords": [
-    "claude-code",
-    "claude-code-mod",
-    "agent-skills",
-    "skills"
-  ],
-  "author": "yuu1111",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/yuu1111/claude-agents-skills.git"
-  },
-  "license": "MIT",
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.8",
-    "@yuu1111/biome-config": "^2.0.0"
-  }
+	"name": "claude-agents-skills",
+	"version": "0.1.0",
+	"description": "Claude Code mod that loads Agent Skills from the shared .agents/skills directories",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"lint": "biome check .",
+		"format": "biome check --write --unsafe ."
+	},
+	"keywords": [
+		"claude-code",
+		"claude-code-mod",
+		"agent-skills",
+		"skills"
+	],
+	"author": "yuu1111",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/yuu1111/claude-agents-skills.git"
+	},
+	"license": "MIT",
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.8",
+		"@yuu1111/biome-config": "^2.0.0"
+	}
 }

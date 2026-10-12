@@ -1,11 +1,11 @@
 {
-  "name": "agents-skills",
-  "version": "0.1.0",
-  "description": "Load Agent Skills from the shared .agents/skills directories (project and user) into Claude Code",
-  "author": {
-    "name": "yuu1111",
-    "url": "https://github.com/yuu1111"
-  },
-  "repository": "https://github.com/yuu1111/claude-agents-skills",
-  "license": "MIT"
+	"name": "agents-skills",
+	"version": "0.1.0",
+	"description": "Load Agent Skills from the shared .agents/skills directories (project and user) into Claude Code",
+	"author": {
+		"name": "yuu1111",
+		"url": "https://github.com/yuu1111"
+	},
+	"repository": "https://github.com/yuu1111/claude-agents-skills",
+	"license": "MIT"
 }
