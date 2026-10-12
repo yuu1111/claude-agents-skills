@@ -1,6 +1,4 @@
 // biome-ignore-all lint/suspicious/noExplicitAny: エンジンが実行時に渡すオブジェクトに型定義を同梱しないため
-// Claude Code は .agents/skills をネイティブに読まないため
-// skills を探索して prompt.context へ一覧を出し 同名の slash command を登録する
 
 type Entry = {
 	name: string;
@@ -11,6 +9,7 @@ type Entry = {
 
 const TRAILING = /[\\/]+$/;
 const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n?/;
 
 function joinPath(base: string, name: string): string {
 	return `${base.replace(TRAILING, "")}/${name}`;
@@ -79,6 +78,39 @@ async function scanRoot(
 	}
 }
 
+function normalizePath(path: string): string {
+	return path
+		.replace(/[\\/]+/g, "/")
+		.replace(/\/+$/, "")
+		.toLowerCase();
+}
+
+async function isRepoRoot($: any, dir: string): Promise<boolean> {
+	try {
+		return await $.fs.exists(joinPath(dir, ".git"));
+	} catch {
+		return false;
+	}
+}
+
+async function collectProjectRoots(
+	$: any,
+	cwd: string,
+	homeKey: string,
+): Promise<string[]> {
+	const roots: string[] = [];
+	let dir = cwd ? cwd.replace(TRAILING, "") : "";
+	for (let depth = 0; dir && depth < 32; depth += 1) {
+		if (homeKey && normalizePath(dir) === homeKey) break;
+		roots.push(dir);
+		if (await isRepoRoot($, dir)) break;
+		const parent = parentOf(dir);
+		if (!parent || parent === dir) break;
+		dir = parent;
+	}
+	return roots;
+}
+
 async function discover($: any): Promise<Entry[]> {
 	const found: Entry[] = [];
 	const seen = new Set<string>();
@@ -88,16 +120,19 @@ async function discover($: any): Promise<Entry[]> {
 	} catch {
 		cwd = "";
 	}
-	let dir = cwd ? cwd.replace(TRAILING, "") : "";
-	for (let depth = 0; dir && depth < 32; depth += 1) {
+	const home =
+		(await $.env.get("HOME")) ?? (await $.env.get("USERPROFILE")) ?? "";
+	const roots = await collectProjectRoots(
+		$,
+		cwd,
+		home ? normalizePath(home) : "",
+	);
+	for (const dir of roots) {
 		await scanRoot($, joinPath(dir, ".agents/skills"), "project", found, seen);
-		const parent = parentOf(dir);
-		if (!parent || parent === dir) break;
-		dir = parent;
 	}
-	const home = (await $.env.get("HOME")) ?? (await $.env.get("USERPROFILE"));
-	if (home)
+	if (home) {
 		await scanRoot($, joinPath(home, ".agents/skills"), "user", found, seen);
+	}
 	const byName = new Map<string, Entry>();
 	for (const entry of found)
 		if (!byName.has(entry.name)) byName.set(entry.name, entry);
@@ -105,27 +140,45 @@ async function discover($: any): Promise<Entry[]> {
 }
 
 function catalog(entries: Entry[]): string {
-	const lines = entries.map(
-		(entry) =>
-			`- ${entry.name}: ${entry.description || "(no description)"} — ${entry.path}`,
-	);
 	return [
-		"Agent Skills shared through .agents/skills (the same files other coding agents read):",
-		...lines,
-		"When a task matches one of these skills, read its SKILL.md with the Read tool and follow it.",
+		"Agent Skills shared through .agents/skills, the same files other coding agents read:",
+		...entries.map(
+			(entry) => `- ${entry.name}: ${entry.description || "(no description)"}`,
+		),
+		"Invoke one with the Skill tool by name, or read its SKILL.md before following it:",
+		...entries.map((entry) => `- ${entry.name} → ${entry.path}`),
 	].join("\n");
 }
 
-let entries: Entry[] | null = null;
+async function bodyOf(
+	$: any,
+	entry: Entry,
+	args: string,
+): Promise<string | null> {
+	try {
+		const text = await $.fs.read(entry.path);
+		if (typeof text !== "string") return null;
+		return text
+			.replace(FRONTMATTER, "")
+			.split("$ARGUMENTS")
+			.join(args ?? "");
+	} catch {
+		return null;
+	}
+}
+
+let entries: Entry[] = [];
+let loaded = false;
 
 async function loadEntries($: any, refresh: boolean): Promise<Entry[]> {
-	if (entries && !refresh) return entries;
+	if (loaded && !refresh) return entries;
 	try {
 		entries = await discover($);
+		loaded = true;
 	} catch {
-		entries = entries ?? [];
+		loaded = true;
 	}
-	return entries ?? [];
+	return entries;
 }
 
 export function register(on: any): void {
@@ -156,26 +209,37 @@ export function register(on: any): void {
 		return next(e);
 	});
 
-	on("prompt.context", async ($: any, e: any, next: any) => {
+	on("prompt.compose", async ($: any, e: any, next: any) => {
+		const composed = await next(e);
 		const list = await loadEntries($, false);
-		if (!list.length) return next(e);
-		return next({
-			...e,
-			blocks: [...e.blocks, { name: "agentsSkills", text: catalog(list) }],
-		});
+		if (!list.length) return composed;
+		const sections = composed?.sections ?? [];
+		return {
+			sections: [
+				...sections,
+				{ id: "agents_skills", text: catalog(list), scope: "session" },
+			],
+		};
 	});
 
 	on("command.run", async ($: any, e: any, next: any) => {
 		const list = await loadEntries($, false);
 		const entry = list.find((candidate) => candidate.name === e.command);
 		if (!entry) return next(e);
-		let text = "";
-		try {
-			text = await $.fs.read(entry.path);
-		} catch {
-			return next(e);
-		}
-		const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
-		return { text: body.split("$ARGUMENTS").join(e.args ?? "") };
+		const body = await bodyOf($, entry, e.args ?? "");
+		if (body === null) return next(e);
+		return { text: body };
+	}).catch((_$: any, e: any, next: any) => next(e));
+
+	on("tool.call", { tool: "Skill" }, async ($: any, e: any, next: any) => {
+		const list = await loadEntries($, false);
+		const entry = list.find((candidate) => candidate.name === e.skill);
+		if (!entry) return next(e);
+		const body = await bodyOf($, entry, e.args ?? "");
+		if (body === null) return next(e);
+		return {
+			result: { success: true, commandName: entry.name },
+			context: [body],
+		};
 	}).catch((_$: any, e: any, next: any) => next(e));
 }

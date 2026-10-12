@@ -10,9 +10,15 @@ Claude Code reads `.claude/skills` and does not read `.agents/skills`. Codex, Cu
 
 | Event | Behaviour |
 | :- | :- |
-| `session.start` | Scans `~/.agents/skills/*/SKILL.md` and every `<ancestor>/.agents/skills/*/SKILL.md` from the session's working directory upwards. Registers each skill as `/<name>` and skips names Claude Code already provides |
-| `prompt.context` | Adds an `agentsSkills` block that lists each skill with its description and path, and tells the model to read the matching `SKILL.md` with the Read tool |
+| `session.start` | Registers every discovered skill as `/<name>`, skipping names Claude Code already provides |
+| `prompt.compose` | Appends an `agents_skills` section to the system prompt that lists each skill with its description and path |
 | `command.run` | Expands `/<name>` into that skill's body, replacing `$ARGUMENTS` with what the user typed |
+| `tool.call` on `Skill` | Serves the skill body when the model invokes it through the Skill tool, so the model reaches `.agents/skills` skills the way it reaches first-party ones |
+
+## Where it looks
+
+- The working directory and every ancestor up to the repository root, which is the first directory holding `.git`: `<dir>/.agents/skills/*/SKILL.md`
+- `~/.agents/skills/*/SKILL.md`, never treating the home directory or anything above it as project scope
 
 A skill found nearer the working directory wins over one of the same name further up, and project skills win over user skills.
 
@@ -41,13 +47,13 @@ claude --plugin-dir ./plugins/agents-skills
 plugins/agents-skills/
   .claude-plugin/plugin.json           plugin manifest
   hooks/hooks.json                     points at the hooks module, which is what makes it a mod
-  hooks/register.ts                    discovery, catalog block and slash commands
+  hooks/register.ts                    discovery, system prompt section, slash commands, Skill tool
 ```
 
 ## Limits
 
-- Not native discovery. Claude Code still does not walk `.agents` itself, so skills reach the session through these hooks.
-- The model reaches a skill body with the Read tool instead of Claude Code's Skill tool, so first-party skill listings, progress rows and permission prompts do not apply.
+- Not native discovery. The engine still does not walk `.agents/skills` itself, so skills reach the session through these hooks.
+- Engine-owned inventories, such as the skill list behind `/skills` and the Skill tool's own listing of known skills, do not contain these skills. The system prompt section is where the model learns about them.
 - A mod runs with your permissions and is not sandboxed. Read the module before installing.
 - The mods API is early access and may change between releases.
 

@@ -10,11 +10,17 @@ Codex、Cursor、OpenCode、Kilo Code、GitHub Copilotは `.agents/skills` を�
 
 ## 動作
 
-| タイミング | 内容 |
+| フック | 内容 |
 | :- | :- |
-| `session.start` | `~/.agents/skills/*/SKILL.md` とセッションの作業ディレクトリから上位へ向かう `<ancestor>/.agents/skills/*/SKILL.md` を走査する 各Skillを `/<name>` として登録し Claude Codeが既に持つ名前は飛ばす |
-| `prompt.context` | 各Skillの名前・説明・パスを並べた `agentsSkills` ブロックを足し 該当する `SKILL.md` をReadツールで読むようモデルに伝える |
+| `session.start` | 見つけた各Skillを `/<name>` として登録する Claude Codeが既に持つ名前は飛ばす |
+| `prompt.compose` | システムプロンプトへ `agents_skills` セクションを足し 各Skillの説明とパスを並べる |
 | `command.run` | `/<name>` をSkill本文へ展開し `$ARGUMENTS` を入力内容で置き換える |
+| `tool.call`（`Skill`） | モデルがSkillツールで呼んだとき本文を返す ネイティブSkillと同じ経路で到達できる |
+
+## 探索範囲
+
+- 作業ディレクトリから `.git` を持つ最初のディレクトリ（リポジトリルート）までの各階層の `<dir>/.agents/skills/*/SKILL.md`
+- `~/.agents/skills/*/SKILL.md` ホームディレクトリとその上位はプロジェクト範囲として扱わない
 
 作業ディレクトリに近いSkillが同名の上位のSkillより優先され プロジェクトのSkillがユーザーのSkillより優先される
 
@@ -43,13 +49,13 @@ claude --plugin-dir ./plugins/agents-skills
 plugins/agents-skills/
   .claude-plugin/plugin.json           pluginのmanifest
   hooks/hooks.json                     hooksモジュールを指す これがmodの印
-  hooks/register.ts                    探索、カタログブロック、slash command
+  hooks/register.ts                    探索、システムプロンプトのセクション、slash command、Skillツール
 ```
 
 ## 制約
 
-- ネイティブ探索ではない Claude Codeは `.agents` を自分で走査しないため これらのフック経由でSkillが届く
-- モデルはSkill本文へSkillツールではなくReadツールで到達する そのためネイティブSkillの一覧表示・進行表示・権限確認は適用されない
+- ネイティブ探索ではない エンジン自身は `.agents/skills` を走査しないため これらのフック経由でSkillが届く
+- `/skills` が裏に持つSkill一覧や Skillツールが知るSkillの在庫には載らない モデルはシステムプロンプトのセクションで知る
 - modは自分の権限で動きサンドボックス化されない 導入前にモジュールを読むこと
 - mods APIはアーリーアクセスでリリースごとに変わりうる
 
